@@ -81,14 +81,36 @@ class DriveWebPConverter {
                 });
             });
             
-            // Google API Client 초기화 (API Key 없이)
+            // Google API Client 초기화
+            console.log('gapi.client.init 시작...');
             const initConfig = {
+                apiKey: this.API_KEY,
                 discoveryDocs: this.DISCOVERY_DOCS
             };
-            if (this.API_KEY) {
-                initConfig.apiKey = this.API_KEY;
+            
+            try {
+                await gapi.client.init(initConfig);
+                console.log('gapi.client.init 성공');
+            } catch (initError) {
+                console.error('gapi.client.init 실패, 단계별 로딩 시도:', initError);
+                
+                // 단계적 로딩 시도
+                try {
+                    // 1단계: 기본 초기화
+                    await gapi.client.init({
+                        apiKey: this.API_KEY
+                    });
+                    console.log('기본 gapi.client.init 성공');
+                    
+                    // 2단계: Drive API 수동 로드
+                    await gapi.client.load('drive', 'v3');
+                    console.log('Drive API v3 로드 성공');
+                    
+                } catch (fallbackError) {
+                    console.error('fallback 로딩도 실패:', fallbackError);
+                    throw new Error('Google API 클라이언트 초기화에 완전히 실패했습니다.');
+                }
             }
-            await gapi.client.init(initConfig);
             console.log('gapi client 초기화 완료');
             
             // Google Identity Services가 로드될 때까지 대기
@@ -347,6 +369,7 @@ class DriveWebPConverter {
                             .setSelectFolderEnabled(false)
                             .setIncludeFolders(true))
                         .setOAuthToken(token.access_token)
+                        .setDeveloperKey(this.API_KEY)
                         .setOrigin(window.location.protocol + '//' + window.location.host)
                         .setSize(600, 425)
                         .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
@@ -418,6 +441,7 @@ class DriveWebPConverter {
                         .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS)
                             .setSelectFolderEnabled(true))
                         .setOAuthToken(token.access_token)
+                        .setDeveloperKey(this.API_KEY)
                         .setOrigin(window.location.protocol + '//' + window.location.host)
                         .setSize(600, 425)
                         .setCallback((data) => {

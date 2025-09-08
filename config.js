@@ -11,7 +11,7 @@ const CONFIG = {
     // Google Cloud Console에서 발급받은 API 키
     // 임시로 비활성화 - Client ID와 다른 프로젝트 문제로 인해
     // TODO: Client ID와 동일한 프로젝트에서 새 API Key 생성 필요
-    API_KEY: '',
+    API_KEY: 'AIzaSyCKyVvJHl6MnwYXThwzSmvhtlJgzRyy_IU',
     
     // 필요한 권한 범위 - 전체 Google Drive 액세스 권한
     // drive: 모든 파일과 폴더에 대한 전체 접근 권한 (읽기/쓰기/삭제)
