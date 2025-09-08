@@ -548,31 +548,63 @@ class DriveWebPConverter {
     }
 
     async convertAndUploadFile(file, index, quality) {
+        const fileName = file.name;
+        const fileId = file.id;
+        
         try {
-            console.log(`파일 변환 시작: ${file.name} (ID: ${file.id})`);
+            console.log(`🚀 [${fileName}] 변환 프로세스 시작 (ID: ${fileId})`);
             
+            // 1단계: 파일 다운로드
+            console.log(`📥 [${fileName}] 1단계: Google Drive에서 다운로드 시작...`);
             this.updateFileStatus(index, '다운로드 중', 'loading');
-            const fileBlob = await this.downloadFile(file.id);
+            
+            const startDownload = Date.now();
+            const fileBlob = await this.downloadFile(fileId);
+            const downloadTime = Date.now() - startDownload;
             
             if (!fileBlob || fileBlob.size === 0) {
                 throw new Error('다운로드된 파일이 비어있습니다.');
             }
             
+            console.log(`✅ [${fileName}] 1단계 성공: 다운로드 완료 (${fileBlob.size} bytes, ${downloadTime}ms)`);
+            
+            // 2단계: WebP 변환
+            console.log(`🔄 [${fileName}] 2단계: WebP 변환 시작... (품질: ${quality})`);
             this.updateFileStatus(index, '변환 중', 'loading');
+            
+            const startConvert = Date.now();
             const webpBlob = await this.convertToWebP(fileBlob, quality);
+            const convertTime = Date.now() - startConvert;
             
             if (!webpBlob || webpBlob.size === 0) {
                 throw new Error('WebP 변환에 실패했습니다.');
             }
             
-            this.updateFileStatus(index, '업로드 중', 'loading');
-            const webpFileName = file.name.replace(/\.(jpg|jpeg)$/i, '.webp');
-            await this.uploadFile(webpBlob, webpFileName, this.targetFolder.id);
+            const compressionRatio = ((fileBlob.size - webpBlob.size) / fileBlob.size * 100).toFixed(1);
+            console.log(`✅ [${fileName}] 2단계 성공: WebP 변환 완료 (${webpBlob.size} bytes, ${convertTime}ms, ${compressionRatio}% 압축)`);
             
+            // 3단계: Google Drive에 업로드
+            const webpFileName = fileName.replace(/\.(jpg|jpeg)$/i, '.webp');
+            console.log(`📤 [${fileName}] 3단계: Google Drive에 업로드 시작... (${webpFileName})`);
+            this.updateFileStatus(index, '업로드 중', 'loading');
+            
+            const startUpload = Date.now();
+            await this.uploadFile(webpBlob, webpFileName, this.targetFolder.id);
+            const uploadTime = Date.now() - startUpload;
+            
+            console.log(`✅ [${fileName}] 3단계 성공: 업로드 완료 (${uploadTime}ms)`);
+            
+            const totalTime = Date.now() - (startDownload);
             this.updateFileStatus(index, '완료', 'success');
-            console.log(`파일 변환 완료: ${webpFileName}`);
+            console.log(`🎉 [${fileName}] 전체 프로세스 완료 (총 ${totalTime}ms)`);
+            
         } catch (error) {
-            console.error(`파일 변환 실패 (${file.name}):`, error);
+            console.error(`❌ [${fileName}] 변환 실패:`, {
+                error: error.message,
+                stack: error.stack,
+                fileId: fileId,
+                fileName: fileName
+            });
             this.updateFileStatus(index, `실패: ${error.message}`, 'error');
             throw error;
         }
@@ -585,12 +617,11 @@ class DriveWebPConverter {
                 throw new Error('인증 토큰이 없습니다.');
             }
             
-            // 토큰 디버깅 정보
-            console.log('토큰 정보:', {
+            // 토큰 디버깅 정보 (간소화)
+            console.log('🔑 다운로드용 토큰 검증:', {
                 hasToken: !!token,
                 hasAccessToken: !!token.access_token,
-                scope: token.scope || 'scope 정보 없음',
-                expiresIn: token.expires_in || 'expiry 정보 없음'
+                hasDriveAccess: token.scope?.includes('auth/drive') || false
             });
             
             // 먼저 gapi.client 방식 시도
@@ -702,6 +733,8 @@ class DriveWebPConverter {
 
     async uploadFile(blob, fileName, folderId) {
         try {
+            console.log(`📤 업로드 시작: ${fileName} (${blob.size} bytes) → 폴더 ID: ${folderId}`);
+            
             if (!blob || blob.size === 0) {
                 throw new Error('업로드할 파일 데이터가 없습니다.');
             }
@@ -710,10 +743,12 @@ class DriveWebPConverter {
                 name: fileName,
                 parents: [folderId]
             };
+            console.log('📝 업로드 메타데이터:', metadata);
 
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', blob);
+            console.log('📦 FormData 생성 완료');
 
             if (!this.isAuthenticated) {
                 throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
@@ -725,6 +760,8 @@ class DriveWebPConverter {
             }
 
             const accessToken = token.access_token;
+            console.log('🌐 Google Drive Upload API 호출 중...');
+            
             const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                 method: 'POST',
                 headers: new Headers({
@@ -733,13 +770,18 @@ class DriveWebPConverter {
                 body: form
             });
 
+            console.log(`📡 업로드 응답 상태: ${response.status} ${response.statusText}`);
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => null);
+                console.error('❌ 업로드 실패 응답:', errorData);
                 const errorMessage = errorData?.error?.message || `업로드 실패 (${response.status}: ${response.statusText})`;
                 throw new Error(errorMessage);
             }
 
-            return response.json();
+            const result = await response.json();
+            console.log('✅ 업로드 성공 응답:', result);
+            return result;
         } catch (error) {
             console.error('Upload failed:', error);
             throw new Error('파일 업로드에 실패했습니다: ' + error.message);
