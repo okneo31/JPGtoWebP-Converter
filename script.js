@@ -144,16 +144,16 @@ class DriveWebPConverter {
                 throw new Error('Google 인증이 초기화되지 않았습니다.');
             }
             
-            // 기존 토큰이 있는지 확인
-            if (gapi.client.getToken() !== null) {
-                this.isAuthenticated = true;
-                this.hideLoadingMessage();
-                this.updateUI();
-                this.showSuccessMessage('이미 로그인되어 있습니다!');
-                return;
+            // 기존 토큰이 있어도 권한 변경으로 인해 재인증 필요
+            const existingToken = gapi.client.getToken();
+            if (existingToken !== null) {
+                console.log('기존 토큰 발견, 권한 업데이트를 위해 재인증 진행');
+                // 기존 토큰 해제
+                google.accounts.oauth2.revoke(existingToken.access_token);
+                gapi.client.setToken('');
             }
             
-            // 새로운 토큰 요청
+            // 새로운 토큰 요청 (권한 변경으로 인해 강제로 동의 화면 표시)
             this.tokenClient.requestAccessToken({ prompt: 'consent' });
             
         } catch (error) {

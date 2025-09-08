@@ -13,7 +13,8 @@ const CONFIG = {
     API_KEY: 'AIzaSyDxUD6u6TVk6saBgUDsGDClB6pD98M30fM',
     
     // 필요한 권한 범위
-    SCOPES: 'https://www.googleapis.com/auth/drive.file',
+    // drive.readonly: 모든 파일 읽기, drive.file: 앱이 생성한 파일 쓰기
+    SCOPES: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
     
     // 사용할 Google API 문서
     DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
