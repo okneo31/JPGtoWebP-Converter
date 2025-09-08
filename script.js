@@ -1,3 +1,24 @@
+// 전역 변수로 API 로딩 상태 추적
+let gapiLoaded = false;
+let gsiLoaded = false;
+
+// API 로딩 완료 후 호출되는 함수들
+function initGoogleAPI() {
+    gapiLoaded = true;
+    checkAndInitialize();
+}
+
+function initGoogleIdentity() {
+    gsiLoaded = true;
+    checkAndInitialize();
+}
+
+function checkAndInitialize() {
+    if (gapiLoaded && gsiLoaded && typeof CONFIG !== 'undefined') {
+        new DriveWebPConverter();
+    }
+}
+
 class DriveWebPConverter {
     constructor() {
         if (typeof CONFIG === 'undefined') {
@@ -32,46 +53,43 @@ class DriveWebPConverter {
     }
 
     async loadGoogleAPIs() {
-        return new Promise((resolve, reject) => {
-            let retryCount = 0;
-            const maxRetries = 50;
+        try {
+            console.log('Google API 초기화 시작');
             
-            const tryLoad = () => {
-                if (typeof gapi !== 'undefined') {
-                    try {
-                        gapi.load('auth2:picker', {
-                            callback: () => {
-                                gapi.auth2.init({
-                                    client_id: this.CLIENT_ID
-                                }).then(() => {
-                                    console.log('Google APIs loaded successfully');
-                                    resolve();
-                                }).catch(error => {
-                                    console.error('Failed to initialize Google Auth:', error);
-                                    reject(new Error('Google Auth 초기화에 실패했습니다. CLIENT_ID를 확인해주세요.'));
-                                });
-                            },
-                            onerror: (error) => {
-                                console.error('Failed to load Google APIs:', error);
-                                reject(new Error('Google API 로드에 실패했습니다.'));
-                            }
-                        });
-                    } catch (error) {
-                        console.error('Error during Google API initialization:', error);
-                        reject(new Error('Google API 초기화 중 오류가 발생했습니다.'));
+            // gapi 초기화
+            await new Promise((resolve, reject) => {
+                gapi.load('client:picker', {
+                    callback: resolve,
+                    onerror: reject
+                });
+            });
+            
+            // Google API Client 초기화
+            await gapi.client.init({
+                apiKey: this.API_KEY,
+                discoveryDocs: this.DISCOVERY_DOCS
+            });
+            
+            // Google Identity Services 초기화
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: this.CLIENT_ID,
+                scope: this.SCOPES,
+                callback: (response) => {
+                    if (response.error !== undefined) {
+                        throw response;
                     }
-                } else {
-                    retryCount++;
-                    if (retryCount >= maxRetries) {
-                        reject(new Error('Google API 로드 시간이 초과되었습니다. 인터넷 연결을 확인해주세요.'));
-                        return;
-                    }
-                    setTimeout(tryLoad, 100);
+                    this.isAuthenticated = true;
+                    console.log('Google 인증 성공');
+                    this.updateUI();
                 }
-            };
+            });
             
-            tryLoad();
-        });
+            console.log('Google APIs loaded successfully');
+            return true;
+        } catch (error) {
+            console.error('Google API 로딩 실패:', error);
+            throw new Error('Google API 로딩에 실패했습니다. 설정을 확인해주세요.');
+        }
     }
 
     initializeUI() {
@@ -95,25 +113,22 @@ class DriveWebPConverter {
         try {
             this.showLoadingMessage('로그인 중...');
             
-            const authInstance = gapi.auth2.getAuthInstance();
-            if (!authInstance) {
-                throw new Error('Google Auth가 초기화되지 않았습니다.');
+            if (!this.tokenClient) {
+                throw new Error('Google 인증이 초기화되지 않았습니다.');
             }
             
-            const user = await authInstance.signIn();
-            this.isAuthenticated = true;
-            this.currentUser = user;
+            // 기존 토큰이 있는지 확인
+            if (gapi.client.getToken() !== null) {
+                this.isAuthenticated = true;
+                this.hideLoadingMessage();
+                this.updateUI();
+                this.showSuccessMessage('이미 로그인되어 있습니다!');
+                return;
+            }
             
-            await gapi.client.init({
-                apiKey: this.API_KEY,
-                clientId: this.CLIENT_ID,
-                discoveryDocs: this.DISCOVERY_DOCS,
-                scope: this.SCOPES
-            });
+            // 새로운 토큰 요청
+            this.tokenClient.requestAccessToken({ prompt: 'consent' });
             
-            this.hideLoadingMessage();
-            this.updateUI();
-            this.showSuccessMessage('로그인에 성공했습니다!');
         } catch (error) {
             console.error('로그인 실패:', error);
             this.hideLoadingMessage();
@@ -132,8 +147,11 @@ class DriveWebPConverter {
     }
 
     async signOut() {
-        const authInstance = gapi.auth2.getAuthInstance();
-        await authInstance.signOut();
+        const token = gapi.client.getToken();
+        if (token !== null) {
+            google.accounts.oauth2.revoke(token.access_token);
+            gapi.client.setToken('');
+        }
         this.isAuthenticated = false;
         this.currentUser = null;
         this.resetData();

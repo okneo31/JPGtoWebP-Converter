@@ -6,7 +6,7 @@ const CONFIG = {
     // 1. https://console.cloud.google.com/ 에서 새 프로젝트 생성
     // 2. "API 및 서비스" > "라이브러리"에서 Google Drive API와 Google Picker API 활성화
     // 3. "API 및 서비스" > "사용자 인증 정보"에서 OAuth 2.0 클라이언트 ID 생성
-    CLIENT_ID: '1084510936539-ntktmqq1tcid36tjbd9hl5uekdn9mj4o.apps.googleusercontent.com',
+    CLIENT_ID: '1084510936539-hohf61f106rtviss6tig473cmq0db7ie.apps.googleusercontent.com',
     
     // Google Cloud Console에서 발급받은 API 키
     // "API 및 서비스" > "사용자 인증 정보"에서 API 키 생성

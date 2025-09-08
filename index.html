@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>드라이브 WebP 컨버터</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleIdentity()"></script>
+    <script src="https://apis.google.com/js/api.js" async defer onload="initGoogleAPI()"></script>
     <script src="config.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -128,5 +128,13 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+        // CONFIG가 로드된 후 초기화 확인
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof CONFIG !== 'undefined') {
+                checkAndInitialize();
+            }
+        });
+    </script>
 </body>
 </html>
