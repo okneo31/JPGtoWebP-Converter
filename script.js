@@ -479,69 +479,122 @@ class DriveWebPConverter {
     }
 
     async convertAndUploadFile(file, index, quality) {
-        this.updateFileStatus(index, '다운로드 중', 'loading');
-
-        const fileBlob = await this.downloadFile(file.id);
-        
-        this.updateFileStatus(index, '변환 중', 'loading');
-        const webpBlob = await this.convertToWebP(fileBlob, quality);
-        
-        this.updateFileStatus(index, '업로드 중', 'loading');
-        const webpFileName = file.name.replace(/\.(jpg|jpeg)$/i, '.webp');
-        await this.uploadFile(webpBlob, webpFileName, this.targetFolder.id);
-        
-        this.updateFileStatus(index, '완료', 'success');
+        try {
+            console.log(`파일 변환 시작: ${file.name} (ID: ${file.id})`);
+            
+            this.updateFileStatus(index, '다운로드 중', 'loading');
+            const fileBlob = await this.downloadFile(file.id);
+            
+            if (!fileBlob || fileBlob.size === 0) {
+                throw new Error('다운로드된 파일이 비어있습니다.');
+            }
+            
+            this.updateFileStatus(index, '변환 중', 'loading');
+            const webpBlob = await this.convertToWebP(fileBlob, quality);
+            
+            if (!webpBlob || webpBlob.size === 0) {
+                throw new Error('WebP 변환에 실패했습니다.');
+            }
+            
+            this.updateFileStatus(index, '업로드 중', 'loading');
+            const webpFileName = file.name.replace(/\.(jpg|jpeg)$/i, '.webp');
+            await this.uploadFile(webpBlob, webpFileName, this.targetFolder.id);
+            
+            this.updateFileStatus(index, '완료', 'success');
+            console.log(`파일 변환 완료: ${webpFileName}`);
+        } catch (error) {
+            console.error(`파일 변환 실패 (${file.name}):`, error);
+            this.updateFileStatus(index, `실패: ${error.message}`, 'error');
+            throw error;
+        }
     }
 
     async downloadFile(fileId) {
         try {
-            const response = await gapi.client.drive.files.get({
-                fileId: fileId,
-                alt: 'media'
-            });
-            
-            if (!response.body) {
-                throw new Error('파일 데이터를 받을 수 없습니다.');
+            const token = gapi.client.getToken();
+            if (!token || !token.access_token) {
+                throw new Error('인증 토큰이 없습니다.');
             }
             
-            return this.base64ToBlob(response.body);
+            // fetch를 사용하여 직접 다운로드
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token.access_token}`,
+                    'Accept': 'image/jpeg, image/jpg, */*'
+                }
+            });
+            
+            if (!response.ok) {
+                console.error('Download response:', response.status, response.statusText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const blob = await response.blob();
+            
+            if (!blob || blob.size === 0) {
+                throw new Error('빈 파일이 다운로드되었습니다.');
+            }
+            
+            console.log(`파일 다운로드 성공: ${blob.size} bytes`);
+            return blob;
         } catch (error) {
             console.error('File download failed:', error);
-            if (error.status === 403) {
-                throw new Error('파일 접근 권한이 없습니다.');
-            } else if (error.status === 404) {
-                throw new Error('파일을 찾을 수 없습니다.');
+            if (error.message.includes('403')) {
+                throw new Error('파일 접근 권한이 없습니다. Google Drive에서 파일을 공유했는지 확인해주세요.');
+            } else if (error.message.includes('404')) {
+                throw new Error('파일을 찾을 수 없습니다. 파일이 삭제되었거나 이동되었을 수 있습니다.');
+            } else if (error.message.includes('401')) {
+                throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
             } else {
                 throw new Error('파일 다운로드에 실패했습니다: ' + (error.message || '알 수 없는 오류'));
             }
         }
     }
 
-    base64ToBlob(base64) {
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new Blob([byteArray], { type: 'image/jpeg' });
-    }
 
     async convertToWebP(blob, quality) {
-        return new Promise((resolve) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            
-            img.onload = () => {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
+        return new Promise((resolve, reject) => {
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
                 
-                canvas.toBlob(resolve, 'image/webp', quality);
-            };
-            
-            img.src = URL.createObjectURL(blob);
+                img.onload = () => {
+                    try {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        canvas.toBlob((webpBlob) => {
+                            URL.revokeObjectURL(img.src); // 메모리 정리
+                            if (webpBlob && webpBlob.size > 0) {
+                                resolve(webpBlob);
+                            } else {
+                                reject(new Error('WebP 변환 결과가 비어있습니다.'));
+                            }
+                        }, 'image/webp', quality);
+                    } catch (drawError) {
+                        URL.revokeObjectURL(img.src);
+                        reject(new Error('이미지 그리기 실패: ' + drawError.message));
+                    }
+                };
+                
+                img.onerror = () => {
+                    URL.revokeObjectURL(img.src);
+                    reject(new Error('이미지 로드에 실패했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.'));
+                };
+                
+                // 타임아웃 설정 (10초)
+                setTimeout(() => {
+                    URL.revokeObjectURL(img.src);
+                    reject(new Error('이미지 변환 시간 초과'));
+                }, 10000);
+                
+                img.src = URL.createObjectURL(blob);
+            } catch (error) {
+                reject(new Error('WebP 변환 초기화 실패: ' + error.message));
+            }
         });
     }
 
