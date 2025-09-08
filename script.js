@@ -647,7 +647,6 @@ class DriveWebPConverter {
             console.log(`✅ [${fileName}] 3단계 성공: 업로드 완료 (${uploadTime}ms)`);
             
             const totalTime = Date.now() - (startDownload);
-            const compressionRatio = ((fileBlob.size - webpBlob.size) / fileBlob.size * 100).toFixed(1);
             this.updateFileStatus(index, `완료 (${compressionRatio}% 압축, ${(totalTime/1000).toFixed(1)}초)`, 'success');
             console.log(`🎉 [${fileName}] 전체 프로세스 완료 (총 ${totalTime}ms)`);
             
