@@ -60,63 +60,57 @@ class DriveWebPConverter {
 
     async loadGoogleAPIs() {
         try {
-            console.log('Google API 초기화 시작');
+            console.log('🚀 Google API 초기화 시작...');
             
-            // gapi가 로드될 때까지 대기
+            // gapi 존재 확인
             if (typeof gapi === 'undefined') {
                 throw new Error('gapi가 로드되지 않았습니다.');
             }
+            console.log('✅ gapi 존재 확인');
             
-            // gapi 초기화
+            // 가장 기본적인 방법으로 gapi.client 로드
             await new Promise((resolve, reject) => {
-                gapi.load('client:picker', {
+                gapi.load('client', {
                     callback: () => {
-                        console.log('gapi client와 picker 로드됨');
+                        console.log('📦 gapi.client 로드됨');
                         resolve();
                     },
                     onerror: (error) => {
-                        console.error('gapi 로드 실패:', error);
+                        console.error('❌ gapi.client 로드 실패:', error);
                         reject(error);
                     }
                 });
             });
             
-            // Google API Client 초기화
-            console.log('gapi.client.init 시작...');
-            const initConfig = {
-                apiKey: this.API_KEY,
-                discoveryDocs: this.DISCOVERY_DOCS
-            };
+            // API Key만으로 기본 초기화
+            await gapi.client.init({
+                apiKey: this.API_KEY
+            });
+            console.log('🔑 gapi.client.init 성공');
             
-            try {
-                await gapi.client.init(initConfig);
-                console.log('gapi.client.init 성공');
-            } catch (initError) {
-                console.error('gapi.client.init 실패, 단계별 로딩 시도:', initError);
-                
-                // 단계적 로딩 시도
-                try {
-                    // 1단계: 기본 초기화
-                    await gapi.client.init({
-                        apiKey: this.API_KEY
-                    });
-                    console.log('기본 gapi.client.init 성공');
-                    
-                    // 2단계: Drive API 수동 로드
-                    await gapi.client.load('drive', 'v3');
-                    console.log('Drive API v3 로드 성공');
-                    
-                } catch (fallbackError) {
-                    console.error('fallback 로딩도 실패:', fallbackError);
-                    throw new Error('Google API 클라이언트 초기화에 완전히 실패했습니다.');
-                }
-            }
-            console.log('gapi client 초기화 완료');
+            // Drive API 로드
+            await gapi.client.load('drive', 'v3');
+            console.log('💾 Drive API 로드 성공');
             
-            // Google Identity Services가 로드될 때까지 대기
+            // Picker API 로드
+            await new Promise((resolve, reject) => {
+                gapi.load('picker', {
+                    callback: () => {
+                        console.log('📁 Picker API 로드됨');
+                        resolve();
+                    },
+                    onerror: (error) => {
+                        console.error('❌ Picker API 로드 실패:', error);
+                        reject(error);
+                    }
+                });
+            });
+            
+            // Google Identity Services 확인
             if (typeof google === 'undefined' || !google.accounts) {
                 throw new Error('Google Identity Services가 로드되지 않았습니다.');
             }
+            console.log('🔐 Google Identity Services 확인됨');
             
             // Google Identity Services 초기화
             this.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -129,7 +123,7 @@ class DriveWebPConverter {
                         return;
                     }
                     this.isAuthenticated = true;
-                    console.log('Google 인증 성공');
+                    console.log('🎉 Google 인증 성공');
                     
                     // 토큰 정보 상세 출력
                     const token = gapi.client.getToken();
@@ -146,6 +140,9 @@ class DriveWebPConverter {
                     } else {
                         console.error('❌ Google Drive 권한이 부족합니다. 현재 scope:', token?.scope);
                     }
+                    
+                    // 사용자 정보 가져오기
+                    this.getUserInfo();
                     
                     this.hideLoadingMessage();
                     this.updateUI();
@@ -228,6 +225,32 @@ class DriveWebPConverter {
         this.updateUI();
     }
 
+    async getUserInfo() {
+        try {
+            // Google Drive API를 통해 사용자 정보 가져오기
+            const response = await gapi.client.drive.about.get({
+                fields: 'user'
+            });
+            
+            if (response.result && response.result.user) {
+                this.currentUser = {
+                    name: response.result.user.displayName,
+                    email: response.result.user.emailAddress,
+                    picture: response.result.user.photoLink
+                };
+                console.log('👤 사용자 정보 로드됨:', this.currentUser);
+            }
+        } catch (error) {
+            console.warn('⚠️ 사용자 정보 로드 실패:', error);
+            // 기본 정보 설정
+            this.currentUser = {
+                name: '사용자',
+                email: '',
+                picture: ''
+            };
+        }
+    }
+
     testPermissions() {
         console.log('🔍 권한 상태 테스트 시작...');
         
@@ -285,10 +308,14 @@ class DriveWebPConverter {
             userInfo.classList.remove('hidden');
             fileSelection.classList.remove('hidden');
 
-            const profile = this.currentUser.getBasicProfile();
-            document.getElementById('user-name').textContent = profile.getName();
-            document.getElementById('user-email').textContent = profile.getEmail();
-            document.getElementById('user-avatar').src = profile.getImageUrl();
+            // 사용자 정보가 있을 때만 표시
+            if (this.currentUser) {
+                document.getElementById('user-name').textContent = this.currentUser.name || '사용자';
+                document.getElementById('user-email').textContent = this.currentUser.email || '';
+                if (this.currentUser.picture) {
+                    document.getElementById('user-avatar').src = this.currentUser.picture;
+                }
+            }
         } else {
             loginSection.classList.remove('hidden');
             userInfo.classList.add('hidden');
@@ -595,7 +622,7 @@ class DriveWebPConverter {
             
             // 2단계: WebP 변환
             console.log(`🔄 [${fileName}] 2단계: WebP 변환 시작... (품질: ${quality})`);
-            this.updateFileStatus(index, '변환 중', 'loading');
+            this.updateFileStatus(index, '변환 중 (합성 사이즈에 따라 30초 소요)', 'loading');
             
             const startConvert = Date.now();
             const webpBlob = await this.convertToWebP(fileBlob, quality);
@@ -611,7 +638,7 @@ class DriveWebPConverter {
             // 3단계: Google Drive에 업로드
             const webpFileName = fileName.replace(/\.(jpg|jpeg)$/i, '.webp');
             console.log(`📤 [${fileName}] 3단계: Google Drive에 업로드 시작... (${webpFileName})`);
-            this.updateFileStatus(index, '업로드 중', 'loading');
+            this.updateFileStatus(index, `업로드 중 (${(webpBlob.size / 1024 / 1024).toFixed(2)}MB)`, 'loading');
             
             const startUpload = Date.now();
             await this.uploadFile(webpBlob, webpFileName, this.targetFolder.id);
@@ -620,7 +647,8 @@ class DriveWebPConverter {
             console.log(`✅ [${fileName}] 3단계 성공: 업로드 완료 (${uploadTime}ms)`);
             
             const totalTime = Date.now() - (startDownload);
-            this.updateFileStatus(index, '완료', 'success');
+            const compressionRatio = ((fileBlob.size - webpBlob.size) / fileBlob.size * 100).toFixed(1);
+            this.updateFileStatus(index, `완료 (${compressionRatio}% 압축, ${(totalTime/1000).toFixed(1)}초)`, 'success');
             console.log(`🎉 [${fileName}] 전체 프로세스 완료 (총 ${totalTime}ms)`);
             
         } catch (error) {
@@ -713,44 +741,95 @@ class DriveWebPConverter {
 
     async convertToWebP(blob, quality) {
         return new Promise((resolve, reject) => {
+            let timeoutId;
+            let objectUrl = null;
+            
+            const cleanup = () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+            };
+            
             try {
+                const fileSizeMB = (blob.size / 1024 / 1024).toFixed(2);
+                console.log('🔄 WebP 변환 시작:', {
+                    원본파일크기: `${fileSizeMB}MB`,
+                    품질: quality,
+                    예상시간: fileSizeMB > 10 ? '20-30초' : fileSizeMB > 5 ? '10-20초' : '5-10초'
+                });
+                
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
                 
+                // 시간초과 설정 (30초 연장)
+                timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('이미지 변환 시간 초과 (30초)'));
+                }, 30000);
+                
                 img.onload = () => {
                     try {
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        ctx.drawImage(img, 0, 0);
+                        const megapixels = (img.width * img.height / 1000000).toFixed(1);
+                        console.log('🖼️ 이미지 로드 완룼:', {
+                            크기: `${img.width}x${img.height}`,
+                            메가픽셀: `${megapixels}MP`
+                        });
                         
+                        // 대형 이미지 최적화: 4K 이상일 경우 리사이즈
+                        let targetWidth = img.width;
+                        let targetHeight = img.height;
+                        const maxDimension = 3840; // 4K 해상도
+                        
+                        if (Math.max(targetWidth, targetHeight) > maxDimension) {
+                            const ratio = maxDimension / Math.max(targetWidth, targetHeight);
+                            targetWidth = Math.floor(targetWidth * ratio);
+                            targetHeight = Math.floor(targetHeight * ratio);
+                            console.log('🔍 대형 이미지 리사이즈:', `${targetWidth}x${targetHeight}`);
+                        }
+                        
+                        canvas.width = targetWidth;
+                        canvas.height = targetHeight;
+                        
+                        // 이미지 그리기 (고품질 설정)
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        
+                        console.log('🎨 Canvas에 이미지 그리기 완료');
+                        
+                        // WebP 변환
                         canvas.toBlob((webpBlob) => {
-                            URL.revokeObjectURL(img.src); // 메모리 정리
+                            cleanup();
                             if (webpBlob && webpBlob.size > 0) {
+                                const compressionRatio = ((blob.size - webpBlob.size) / blob.size * 100).toFixed(1);
+                                console.log('✅ WebP 변환 성공:', {
+                                    원본크기: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
+                                    변환크기: `${(webpBlob.size / 1024 / 1024).toFixed(2)}MB`,
+                                    압축률: `${compressionRatio}%`
+                                });
                                 resolve(webpBlob);
                             } else {
                                 reject(new Error('WebP 변환 결과가 비어있습니다.'));
                             }
-                        }, 'image/webp', quality);
+                        }, 'image/webp', quality / 100);
+                        
                     } catch (drawError) {
-                        URL.revokeObjectURL(img.src);
-                        reject(new Error('이미지 그리기 실패: ' + drawError.message));
+                        cleanup();
+                        reject(new Error('이미지 처리 실패: ' + drawError.message));
                     }
                 };
                 
-                img.onerror = () => {
-                    URL.revokeObjectURL(img.src);
+                img.onerror = (errorEvent) => {
+                    cleanup();
+                    console.error('❌ 이미지 로드 실패:', errorEvent);
                     reject(new Error('이미지 로드에 실패했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.'));
                 };
                 
-                // 타임아웃 설정 (10초)
-                setTimeout(() => {
-                    URL.revokeObjectURL(img.src);
-                    reject(new Error('이미지 변환 시간 초과'));
-                }, 10000);
+                objectUrl = URL.createObjectURL(blob);
+                img.src = objectUrl;
                 
-                img.src = URL.createObjectURL(blob);
             } catch (error) {
+                cleanup();
                 reject(new Error('WebP 변환 초기화 실패: ' + error.message));
             }
         });
