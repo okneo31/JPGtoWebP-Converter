@@ -4,11 +4,14 @@
   "description": "Convert JPG images to WebP format directly in Google Drive",
   "main": "index.html",
   "scripts": {
+    "build-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
+    "build-css-prod": "tailwindcss -i ./src/input.css -o ./dist/output.css --minify",
+    "build": "npm run build-css-prod",
     "dev": "npx http-server -p 8000 -c-1",
     "start": "npx http-server -p 8000",
     "serve": "python -m http.server 8000",
-    "deploy:netlify": "netlify deploy --prod",
-    "deploy:vercel": "vercel --prod"
+    "deploy:netlify": "npm run build && netlify deploy --prod",
+    "deploy:vercel": "npm run build && vercel --prod"
   },
   "keywords": [
     "webp",
@@ -20,7 +23,8 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "tailwindcss": "^3.3.0"
   },
   "repository": {
     "type": "git",
