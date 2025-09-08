@@ -516,7 +516,40 @@ class DriveWebPConverter {
                 throw new Error('인증 토큰이 없습니다.');
             }
             
-            // fetch를 사용하여 직접 다운로드
+            // 토큰 디버깅 정보
+            console.log('토큰 정보:', {
+                hasToken: !!token,
+                hasAccessToken: !!token.access_token,
+                scope: token.scope || 'scope 정보 없음',
+                expiresIn: token.expires_in || 'expiry 정보 없음'
+            });
+            
+            // 먼저 gapi.client 방식 시도
+            try {
+                console.log('gapi.client 방식으로 파일 다운로드 시도...');
+                const response = await gapi.client.drive.files.get({
+                    fileId: fileId,
+                    alt: 'media'
+                });
+                
+                if (response.body) {
+                    // base64 디코딩
+                    const byteCharacters = atob(response.body);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'image/jpeg' });
+                    
+                    console.log(`gapi.client로 파일 다운로드 성공: ${blob.size} bytes`);
+                    return blob;
+                }
+            } catch (gapiError) {
+                console.log('gapi.client 방식 실패, fetch 방식 시도...', gapiError);
+            }
+            
+            // gapi 실패 시 fetch 방식으로 폴백
             const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
                 method: 'GET',
                 headers: {

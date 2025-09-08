@@ -12,9 +12,9 @@ const CONFIG = {
     // "API 및 서비스" > "사용자 인증 정보"에서 API 키 생성
     API_KEY: 'AIzaSyDxUD6u6TVk6saBgUDsGDClB6pD98M30fM',
     
-    // 필요한 권한 범위
-    // drive.readonly: 모든 파일 읽기, drive.file: 앱이 생성한 파일 쓰기
-    SCOPES: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
+    // 필요한 권한 범위 - 전체 Google Drive 액세스 권한
+    // drive: 모든 파일과 폴더에 대한 전체 접근 권한 (읽기/쓰기/삭제)
+    SCOPES: 'https://www.googleapis.com/auth/drive',
     
     // 사용할 Google API 문서
     DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
