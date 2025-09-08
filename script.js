@@ -105,6 +105,23 @@ class DriveWebPConverter {
                     }
                     this.isAuthenticated = true;
                     console.log('Google 인증 성공');
+                    
+                    // 토큰 정보 상세 출력
+                    const token = gapi.client.getToken();
+                    console.log('🔑 인증 완료 토큰 정보:', {
+                        hasToken: !!token,
+                        scope: token?.scope || 'scope 없음',
+                        expiresIn: token?.expires_in,
+                        tokenType: token?.token_type
+                    });
+                    
+                    // 권한 확인
+                    if (token?.scope && token.scope.includes('auth/drive')) {
+                        console.log('✅ Google Drive 전체 액세스 권한 확인됨');
+                    } else {
+                        console.error('❌ Google Drive 권한이 부족합니다. 현재 scope:', token?.scope);
+                    }
+                    
                     this.hideLoadingMessage();
                     this.updateUI();
                     this.showSuccessMessage('로그인에 성공했습니다!');
@@ -122,6 +139,7 @@ class DriveWebPConverter {
     initializeUI() {
         document.getElementById('google-signin-btn').addEventListener('click', () => this.signIn());
         document.getElementById('logout-btn').addEventListener('click', () => this.signOut());
+        document.getElementById('test-permission-btn').addEventListener('click', () => this.testPermissions());
         document.getElementById('select-files-btn').addEventListener('click', () => this.selectFiles());
         document.getElementById('select-folder-btn').addEventListener('click', () => this.selectFolder());
         document.getElementById('start-conversion-btn').addEventListener('click', () => this.startConversion());
@@ -183,6 +201,45 @@ class DriveWebPConverter {
         this.currentUser = null;
         this.resetData();
         this.updateUI();
+    }
+
+    testPermissions() {
+        console.log('🔍 권한 상태 테스트 시작...');
+        
+        if (!this.isAuthenticated) {
+            console.error('❌ 로그인되지 않음');
+            this.showErrorMessage('먼저 로그인해주세요.');
+            return;
+        }
+        
+        const token = gapi.client.getToken();
+        console.log('🔑 현재 토큰 상태:', {
+            hasToken: !!token,
+            scope: token?.scope || 'scope 없음',
+            expiresIn: token?.expires_in,
+            tokenType: token?.token_type,
+            accessToken: token?.access_token ? '토큰 존재함' : '토큰 없음'
+        });
+        
+        if (!token) {
+            console.error('❌ 토큰 없음');
+            this.showErrorMessage('토큰이 없습니다. 다시 로그인해주세요.');
+            return;
+        }
+        
+        if (!token.scope) {
+            console.error('❌ Scope 정보 없음');
+            this.showErrorMessage('권한 정보가 없습니다. 다시 로그인해주세요.');
+            return;
+        }
+        
+        if (token.scope.includes('auth/drive')) {
+            console.log('✅ Google Drive 전체 액세스 권한 확인됨!');
+            this.showSuccessMessage('Google Drive 전체 액세스 권한이 있습니다!');
+        } else {
+            console.error('❌ Google Drive 권한 부족. 현재 scope:', token.scope);
+            this.showErrorMessage('Google Drive 권한이 부족합니다. 다시 로그인하여 권한을 승인해주세요.');
+        }
     }
 
     resetData() {
@@ -264,6 +321,18 @@ class DriveWebPConverter {
             const token = gapi.client.getToken();
             if (!token) {
                 this.showErrorMessage('인증 토큰이 없습니다. 다시 로그인해주세요.');
+                return;
+            }
+            
+            // 파일 선택 전 권한 재확인
+            console.log('📁 파일 선택 시 토큰 상태:', {
+                hasToken: !!token,
+                scope: token?.scope || 'scope 없음',
+                hasDriveAccess: token?.scope?.includes('auth/drive') || false
+            });
+            
+            if (!token.scope || !token.scope.includes('auth/drive')) {
+                this.showErrorMessage('Google Drive 권한이 없습니다. 다시 로그인해주세요.');
                 return;
             }
             
