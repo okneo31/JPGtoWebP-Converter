@@ -1,0 +1,37 @@
+{
+  "name": "drive-webp-converter",
+  "version": "1.0.0",
+  "description": "Convert JPG images to WebP format directly in Google Drive",
+  "main": "index.html",
+  "scripts": {
+    "build-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
+    "build-css-prod": "tailwindcss -i ./src/input.css -o ./dist/output.css --minify",
+    "build": "npm run build-css-prod",
+    "dev": "npx http-server -p 8000 -c-1",
+    "start": "npx http-server -p 8000",
+    "serve": "python -m http.server 8000",
+    "deploy:netlify": "npm run build && netlify deploy --prod",
+    "deploy:vercel": "npm run build && vercel --prod"
+  },
+  "keywords": [
+    "webp",
+    "converter",
+    "google-drive",
+    "image-conversion",
+    "web-app"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "tailwindcss": "^3.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/drive-webp-converter.git"
+  },
+  "homepage": "https://yourusername.github.io/drive-webp-converter",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

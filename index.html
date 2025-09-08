@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>드라이브 WebP 컨버터</title>
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAAAd0SU1FB9YGARc5KB0XV2IAAAAddEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIFRoZSBHSU1Q72QlbgAAAF1JREFUOI9jYGRIYWBgYGbABcQRjOwMfAysDDgBFgZWBjYGbAARBjwAsQYSBrEBqgxYAq0MeAJEBqgNUB2wBpAuQEeAGkAawBpAJkBqgNYAOgC6ANYAMgDWADIAABhIE3mj8h5KAAAAAElFTkSuQmCC">
+    <link href="./dist/output.css" rel="stylesheet">
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleIdentity()"></script>
+    <script src="https://apis.google.com/js/api.js" async defer onload="initGoogleAPI()"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <div class="flex items-center justify-center mb-4">
+                <i class="fas fa-image text-4xl text-indigo-600 mr-3"></i>
+                <h1 class="text-4xl font-bold text-gray-800">드라이브 WebP 컨버터</h1>
+            </div>
+            <p class="text-gray-600 text-lg">구글 드라이브의 JPG 파일을 WebP 형식으로 간편하게 변환하세요</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <!-- Authentication Section -->
+            <div id="auth-section" class="mb-8">
+                <div id="login-section" class="text-center">
+                    <button id="google-signin-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-8 rounded-lg transition duration-300 flex items-center mx-auto">
+                        <i class="fab fa-google mr-3"></i>
+                        Google 계정으로 로그인
+                    </button>
+                </div>
+                <div id="user-info" class="hidden bg-green-50 p-4 rounded-lg border border-green-200">
+                    <div class="flex items-center">
+                        <img id="user-avatar" class="w-12 h-12 rounded-full mr-4" src="" alt="프로필">
+                        <div>
+                            <p class="font-semibold text-gray-800" id="user-name"></p>
+                            <p class="text-gray-600 text-sm" id="user-email"></p>
+                        </div>
+                        <button id="logout-btn" class="ml-auto bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm">
+                            로그아웃
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Selection Section -->
+            <div id="file-selection" class="hidden">
+                <div class="grid md:grid-cols-2 gap-6 mb-8">
+                    <!-- Source Files -->
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-700">
+                            <i class="fas fa-file-image mr-2"></i>변환할 파일 선택
+                        </h3>
+                        <button id="select-files-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 disabled:bg-gray-400">
+                            <i class="fas fa-folder-open mr-2"></i>Drive에서 JPG 파일 선택
+                        </button>
+                        <div id="selected-files-info" class="mt-4 text-sm text-gray-600"></div>
+                    </div>
+
+                    <!-- Destination Folder -->
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-700">
+                            <i class="fas fa-folder mr-2"></i>저장할 폴더 선택
+                        </h3>
+                        <button id="select-folder-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 disabled:bg-gray-400">
+                            <i class="fas fa-folder-plus mr-2"></i>저장할 폴더 선택
+                        </button>
+                        <div id="selected-folder-info" class="mt-4 text-sm text-gray-600"></div>
+                    </div>
+                </div>
+
+                <!-- Conversion Settings -->
+                <div class="bg-gray-50 p-6 rounded-lg mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">
+                        <i class="fas fa-cog mr-2"></i>변환 설정
+                    </h3>
+                    <div class="flex items-center space-x-4">
+                        <label class="text-gray-700 font-medium">품질:</label>
+                        <input type="range" id="quality-slider" min="20" max="100" value="80" class="flex-1">
+                        <span id="quality-value" class="text-gray-700 font-semibold">80%</span>
+                    </div>
+                </div>
+
+                <!-- Start Conversion Button -->
+                <div class="text-center mb-8">
+                    <button id="start-conversion-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 px-12 rounded-lg text-xl transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                        <i class="fas fa-play mr-3"></i>변환 시작!
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progress-section" class="hidden">
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-semibold text-gray-700">전체 진행률</h3>
+                        <span id="overall-progress-text" class="text-gray-600">0/0 완료</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div id="overall-progress-bar" class="bg-indigo-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- File List -->
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">
+                        <i class="fas fa-list mr-2"></i>파일 목록 및 상태
+                    </h3>
+                    <div id="file-list" class="space-y-3 max-h-96 overflow-y-auto">
+                        <!-- Files will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div id="results-section" class="hidden mt-6 p-6 rounded-lg">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-check-circle mr-2"></i>변환 결과
+                    </h3>
+                    <div id="results-summary" class="text-gray-700"></div>
+                    <button id="new-conversion-btn" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg">
+                        새 변환 시작
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIG가 로드된 후 초기화 확인
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof CONFIG !== 'undefined') {
+                checkAndInitialize();
+            }
+        });
+    </script>
+</body>
+</html>
