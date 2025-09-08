@@ -15,7 +15,13 @@ function initGoogleIdentity() {
 
 function checkAndInitialize() {
     if (gapiLoaded && gsiLoaded && typeof CONFIG !== 'undefined') {
-        new DriveWebPConverter();
+        // gapi가 실제로 로드되었는지 확인
+        if (typeof gapi !== 'undefined' && typeof google !== 'undefined') {
+            new DriveWebPConverter();
+        } else {
+            console.log('API 로딩 대기 중...');
+            setTimeout(checkAndInitialize, 500);
+        }
     }
 }
 
@@ -56,11 +62,22 @@ class DriveWebPConverter {
         try {
             console.log('Google API 초기화 시작');
             
+            // gapi가 로드될 때까지 대기
+            if (typeof gapi === 'undefined') {
+                throw new Error('gapi가 로드되지 않았습니다.');
+            }
+            
             // gapi 초기화
             await new Promise((resolve, reject) => {
                 gapi.load('client:picker', {
-                    callback: resolve,
-                    onerror: reject
+                    callback: () => {
+                        console.log('gapi client와 picker 로드됨');
+                        resolve();
+                    },
+                    onerror: (error) => {
+                        console.error('gapi 로드 실패:', error);
+                        reject(error);
+                    }
                 });
             });
             
@@ -69,6 +86,12 @@ class DriveWebPConverter {
                 apiKey: this.API_KEY,
                 discoveryDocs: this.DISCOVERY_DOCS
             });
+            console.log('gapi client 초기화 완료');
+            
+            // Google Identity Services가 로드될 때까지 대기
+            if (typeof google === 'undefined' || !google.accounts) {
+                throw new Error('Google Identity Services가 로드되지 않았습니다.');
+            }
             
             // Google Identity Services 초기화
             this.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -76,11 +99,15 @@ class DriveWebPConverter {
                 scope: this.SCOPES,
                 callback: (response) => {
                     if (response.error !== undefined) {
-                        throw response;
+                        console.error('인증 오류:', response);
+                        this.showErrorMessage('인증에 실패했습니다: ' + response.error);
+                        return;
                     }
                     this.isAuthenticated = true;
                     console.log('Google 인증 성공');
+                    this.hideLoadingMessage();
                     this.updateUI();
+                    this.showSuccessMessage('로그인에 성공했습니다!');
                 }
             });
             
@@ -88,7 +115,7 @@ class DriveWebPConverter {
             return true;
         } catch (error) {
             console.error('Google API 로딩 실패:', error);
-            throw new Error('Google API 로딩에 실패했습니다. 설정을 확인해주세요.');
+            throw new Error('Google API 로딩에 실패했습니다: ' + error.message);
         }
     }
 
