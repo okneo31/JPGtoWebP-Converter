@@ -81,11 +81,14 @@ class DriveWebPConverter {
                 });
             });
             
-            // Google API Client 초기화
-            await gapi.client.init({
-                apiKey: this.API_KEY,
+            // Google API Client 초기화 (API Key 없이)
+            const initConfig = {
                 discoveryDocs: this.DISCOVERY_DOCS
-            });
+            };
+            if (this.API_KEY) {
+                initConfig.apiKey = this.API_KEY;
+            }
+            await gapi.client.init(initConfig);
             console.log('gapi client 초기화 완료');
             
             // Google Identity Services가 로드될 때까지 대기
@@ -344,7 +347,6 @@ class DriveWebPConverter {
                             .setSelectFolderEnabled(false)
                             .setIncludeFolders(true))
                         .setOAuthToken(token.access_token)
-                        .setDeveloperKey(this.API_KEY)
                         .setOrigin(window.location.protocol + '//' + window.location.host)
                         .setSize(600, 425)
                         .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
@@ -416,7 +418,6 @@ class DriveWebPConverter {
                         .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS)
                             .setSelectFolderEnabled(true))
                         .setOAuthToken(token.access_token)
-                        .setDeveloperKey(this.API_KEY)
                         .setOrigin(window.location.protocol + '//' + window.location.host)
                         .setSize(600, 425)
                         .setCallback((data) => {
