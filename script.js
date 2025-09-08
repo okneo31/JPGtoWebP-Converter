@@ -267,31 +267,44 @@ class DriveWebPConverter {
                 return;
             }
             
-            return new Promise((resolve) => {
-                const picker = new google.picker.PickerBuilder()
-                    .addView(new google.picker.DocsView(google.picker.ViewId.DOCS)
-                        .setMimeTypes('image/jpeg')
-                        .setSelectFolderEnabled(false))
-                    .setOAuthToken(token.access_token)
-                    .setDeveloperKey(this.API_KEY)
-                    .setCallback((data) => {
-                        if (data.action === google.picker.Action.PICKED) {
-                            this.selectedFiles = data.docs.filter(doc => 
-                                doc.mimeType === 'image/jpeg' && 
-                                doc.sizeBytes <= 100 * 1024 * 1024 // 100MB 제한
-                            ).slice(0, 30); // 최대 30개 파일
+            return new Promise((resolve, reject) => {
+                try {
+                    const picker = new google.picker.PickerBuilder()
+                        .addView(new google.picker.DocsView(google.picker.ViewId.DOCS)
+                            .setMimeTypes('image/jpeg,image/jpg')
+                            .setSelectFolderEnabled(false)
+                            .setIncludeFolders(true))
+                        .setOAuthToken(token.access_token)
+                        .setDeveloperKey(this.API_KEY)
+                        .setOrigin(window.location.protocol + '//' + window.location.host)
+                        .setSize(600, 425)
+                        .setCallback((data) => {
+                            console.log('Picker callback:', data);
                             
-                            if (this.selectedFiles.length !== data.docs.length) {
-                                this.showErrorMessage('일부 파일이 제외되었습니다. (100MB 이하 JPG 파일만, 최대 30개)');
+                            if (data.action === google.picker.Action.PICKED) {
+                                this.selectedFiles = data.docs.filter(doc => 
+                                    (doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/jpg') && 
+                                    doc.sizeBytes <= 100 * 1024 * 1024 // 100MB 제한
+                                ).slice(0, 30); // 최대 30개 파일
+                                
+                                if (this.selectedFiles.length !== data.docs.length) {
+                                    this.showErrorMessage('일부 파일이 제외되었습니다. (100MB 이하 JPG 파일만, 최대 30개)');
+                                }
+                                
+                                this.updateFileSelectionUI();
+                                this.showSuccessMessage(`${this.selectedFiles.length}개 파일이 선택되었습니다.`);
+                            } else if (data.action === google.picker.Action.CANCEL) {
+                                console.log('사용자가 파일 선택을 취소했습니다.');
                             }
-                            
-                            this.updateFileSelectionUI();
-                            this.showSuccessMessage(`${this.selectedFiles.length}개 파일이 선택되었습니다.`);
-                        }
-                        resolve();
-                    })
-                    .build();
-                picker.setVisible(true);
+                            resolve(data);
+                        })
+                        .build();
+                    
+                    picker.setVisible(true);
+                } catch (pickerError) {
+                    console.error('Picker 생성 오류:', pickerError);
+                    reject(pickerError);
+                }
             });
         } catch (error) {
             console.error('파일 선택 오류:', error);
@@ -312,22 +325,34 @@ class DriveWebPConverter {
                 return;
             }
             
-            return new Promise((resolve) => {
-                const picker = new google.picker.PickerBuilder()
-                    .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-                        .setSelectFolderEnabled(true))
-                    .setOAuthToken(token.access_token)
-                    .setDeveloperKey(this.API_KEY)
-                    .setCallback((data) => {
-                        if (data.action === google.picker.Action.PICKED) {
-                            this.targetFolder = data.docs[0];
-                            this.updateFileSelectionUI();
-                            this.showSuccessMessage(`폴더 "${this.targetFolder.name}"이 선택되었습니다.`);
-                        }
-                        resolve();
-                    })
-                    .build();
-                picker.setVisible(true);
+            return new Promise((resolve, reject) => {
+                try {
+                    const picker = new google.picker.PickerBuilder()
+                        .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+                            .setSelectFolderEnabled(true))
+                        .setOAuthToken(token.access_token)
+                        .setDeveloperKey(this.API_KEY)
+                        .setOrigin(window.location.protocol + '//' + window.location.host)
+                        .setSize(600, 425)
+                        .setCallback((data) => {
+                            console.log('Folder picker callback:', data);
+                            
+                            if (data.action === google.picker.Action.PICKED) {
+                                this.targetFolder = data.docs[0];
+                                this.updateFileSelectionUI();
+                                this.showSuccessMessage(`폴더 "${this.targetFolder.name}"이 선택되었습니다.`);
+                            } else if (data.action === google.picker.Action.CANCEL) {
+                                console.log('사용자가 폴더 선택을 취소했습니다.');
+                            }
+                            resolve(data);
+                        })
+                        .build();
+                    
+                    picker.setVisible(true);
+                } catch (pickerError) {
+                    console.error('Folder picker 생성 오류:', pickerError);
+                    reject(pickerError);
+                }
             });
         } catch (error) {
             console.error('폴더 선택 오류:', error);
