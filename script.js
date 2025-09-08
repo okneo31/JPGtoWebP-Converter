@@ -752,7 +752,7 @@ class DriveWebPConverter {
                 const fileSizeMB = (blob.size / 1024 / 1024).toFixed(2);
                 console.log('🔄 WebP 변환 시작:', {
                     원본파일크기: `${fileSizeMB}MB`,
-                    품질: quality,
+                    품질설정: `${(quality * 100).toFixed(0)}% (${quality})`,
                     예상시간: fileSizeMB > 10 ? '20-30초' : fileSizeMB > 5 ? '10-20초' : '5-10초'
                 });
                 
@@ -789,10 +789,24 @@ class DriveWebPConverter {
                         canvas.width = targetWidth;
                         canvas.height = targetHeight;
                         
-                        // 이미지 그리기 (고품질 설정)
+                        // 이미지 그리기 (최고품질 설정)
                         ctx.imageSmoothingEnabled = true;
                         ctx.imageSmoothingQuality = 'high';
-                        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        
+                        // 고해상도를 위한 픽셀 비율 적용
+                        const pixelRatio = window.devicePixelRatio || 1;
+                        if (pixelRatio > 1 && targetWidth * targetHeight < 4000000) { // 4MP 이하에서만 적용
+                            const scaledWidth = targetWidth * pixelRatio;
+                            const scaledHeight = targetHeight * pixelRatio;
+                            canvas.width = scaledWidth;
+                            canvas.height = scaledHeight;
+                            canvas.style.width = targetWidth + 'px';
+                            canvas.style.height = targetHeight + 'px';
+                            ctx.scale(pixelRatio, pixelRatio);
+                            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        } else {
+                            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        }
                         
                         console.log('🎨 Canvas에 이미지 그리기 완료');
                         
@@ -804,13 +818,14 @@ class DriveWebPConverter {
                                 console.log('✅ WebP 변환 성공:', {
                                     원본크기: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
                                     변환크기: `${(webpBlob.size / 1024 / 1024).toFixed(2)}MB`,
-                                    압축률: `${compressionRatio}%`
+                                    압축률: `${compressionRatio}%`,
+                                    품질: `${(quality * 100).toFixed(0)}%`
                                 });
                                 resolve(webpBlob);
                             } else {
                                 reject(new Error('WebP 변환 결과가 비어있습니다.'));
                             }
-                        }, 'image/webp', quality / 100);
+                        }, 'image/webp', quality);
                         
                     } catch (drawError) {
                         cleanup();
