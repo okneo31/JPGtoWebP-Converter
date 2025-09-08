@@ -255,50 +255,84 @@ class DriveWebPConverter {
     }
 
     async selectFiles() {
-        return new Promise((resolve) => {
-            const picker = new google.picker.PickerBuilder()
-                .addView(new google.picker.DocsView(google.picker.ViewId.DOCS)
-                    .setMimeTypes('image/jpeg')
-                    .setSelectFolderEnabled(false))
-                .setOAuthToken(gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token)
-                .setDeveloperKey(this.API_KEY)
-                .setCallback((data) => {
-                    if (data.action === google.picker.Action.PICKED) {
-                        this.selectedFiles = data.docs.filter(doc => 
-                            doc.mimeType === 'image/jpeg' && 
-                            doc.sizeBytes <= 100 * 1024 * 1024 // 100MB 제한
-                        ).slice(0, 30); // 최대 30개 파일
-                        
-                        if (this.selectedFiles.length !== data.docs.length) {
-                            alert('일부 파일이 제외되었습니다. (100MB 이하 JPG 파일만, 최대 30개)');
+        try {
+            if (!this.isAuthenticated) {
+                this.showErrorMessage('먼저 로그인해주세요.');
+                return;
+            }
+            
+            const token = gapi.client.getToken();
+            if (!token) {
+                this.showErrorMessage('인증 토큰이 없습니다. 다시 로그인해주세요.');
+                return;
+            }
+            
+            return new Promise((resolve) => {
+                const picker = new google.picker.PickerBuilder()
+                    .addView(new google.picker.DocsView(google.picker.ViewId.DOCS)
+                        .setMimeTypes('image/jpeg')
+                        .setSelectFolderEnabled(false))
+                    .setOAuthToken(token.access_token)
+                    .setDeveloperKey(this.API_KEY)
+                    .setCallback((data) => {
+                        if (data.action === google.picker.Action.PICKED) {
+                            this.selectedFiles = data.docs.filter(doc => 
+                                doc.mimeType === 'image/jpeg' && 
+                                doc.sizeBytes <= 100 * 1024 * 1024 // 100MB 제한
+                            ).slice(0, 30); // 최대 30개 파일
+                            
+                            if (this.selectedFiles.length !== data.docs.length) {
+                                this.showErrorMessage('일부 파일이 제외되었습니다. (100MB 이하 JPG 파일만, 최대 30개)');
+                            }
+                            
+                            this.updateFileSelectionUI();
+                            this.showSuccessMessage(`${this.selectedFiles.length}개 파일이 선택되었습니다.`);
                         }
-                        
-                        this.updateFileSelectionUI();
-                    }
-                    resolve();
-                })
-                .build();
-            picker.setVisible(true);
-        });
+                        resolve();
+                    })
+                    .build();
+                picker.setVisible(true);
+            });
+        } catch (error) {
+            console.error('파일 선택 오류:', error);
+            this.showErrorMessage('파일 선택 중 오류가 발생했습니다: ' + error.message);
+        }
     }
 
     async selectFolder() {
-        return new Promise((resolve) => {
-            const picker = new google.picker.PickerBuilder()
-                .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-                    .setSelectFolderEnabled(true))
-                .setOAuthToken(gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token)
-                .setDeveloperKey(this.API_KEY)
-                .setCallback((data) => {
-                    if (data.action === google.picker.Action.PICKED) {
-                        this.targetFolder = data.docs[0];
-                        this.updateFileSelectionUI();
-                    }
-                    resolve();
-                })
-                .build();
-            picker.setVisible(true);
-        });
+        try {
+            if (!this.isAuthenticated) {
+                this.showErrorMessage('먼저 로그인해주세요.');
+                return;
+            }
+            
+            const token = gapi.client.getToken();
+            if (!token) {
+                this.showErrorMessage('인증 토큰이 없습니다. 다시 로그인해주세요.');
+                return;
+            }
+            
+            return new Promise((resolve) => {
+                const picker = new google.picker.PickerBuilder()
+                    .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+                        .setSelectFolderEnabled(true))
+                    .setOAuthToken(token.access_token)
+                    .setDeveloperKey(this.API_KEY)
+                    .setCallback((data) => {
+                        if (data.action === google.picker.Action.PICKED) {
+                            this.targetFolder = data.docs[0];
+                            this.updateFileSelectionUI();
+                            this.showSuccessMessage(`폴더 "${this.targetFolder.name}"이 선택되었습니다.`);
+                        }
+                        resolve();
+                    })
+                    .build();
+                picker.setVisible(true);
+            });
+        } catch (error) {
+            console.error('폴더 선택 오류:', error);
+            this.showErrorMessage('폴더 선택 중 오류가 발생했습니다: ' + error.message);
+        }
     }
 
     async startConversion() {
@@ -485,12 +519,16 @@ class DriveWebPConverter {
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', blob);
 
-            const authInstance = gapi.auth2.getAuthInstance();
-            if (!authInstance || !authInstance.currentUser.get().isSignedIn()) {
+            if (!this.isAuthenticated) {
                 throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
             }
+            
+            const token = gapi.client.getToken();
+            if (!token || !token.access_token) {
+                throw new Error('인증 토큰이 없습니다. 다시 로그인해주세요.');
+            }
 
-            const accessToken = authInstance.currentUser.get().getAuthResponse().access_token;
+            const accessToken = token.access_token;
             const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                 method: 'POST',
                 headers: new Headers({
