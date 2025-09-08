@@ -278,21 +278,37 @@ class DriveWebPConverter {
                         .setDeveloperKey(this.API_KEY)
                         .setOrigin(window.location.protocol + '//' + window.location.host)
                         .setSize(600, 425)
+                        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
                         .setCallback((data) => {
                             console.log('Picker callback:', data);
                             
                             if (data.action === google.picker.Action.PICKED) {
-                                this.selectedFiles = data.docs.filter(doc => 
-                                    (doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/jpg') && 
-                                    doc.sizeBytes <= 100 * 1024 * 1024 // 100MB 제한
-                                ).slice(0, 30); // 최대 30개 파일
+                                console.log(`총 ${data.docs.length}개 파일이 선택됨`);
                                 
-                                if (this.selectedFiles.length !== data.docs.length) {
-                                    this.showErrorMessage('일부 파일이 제외되었습니다. (100MB 이하 JPG 파일만, 최대 30개)');
+                                // JPG 파일만 필터링하고 크기 제한 적용
+                                const validFiles = data.docs.filter(doc => {
+                                    const isValidType = doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/jpg';
+                                    const isValidSize = doc.sizeBytes <= 100 * 1024 * 1024; // 100MB 제한
+                                    return isValidType && isValidSize;
+                                });
+                                
+                                // 최대 30개로 제한
+                                this.selectedFiles = validFiles.slice(0, 30);
+                                
+                                // 제외된 파일이 있으면 알림
+                                const excludedCount = data.docs.length - this.selectedFiles.length;
+                                if (excludedCount > 0) {
+                                    let message = `${excludedCount}개 파일이 제외되었습니다. `;
+                                    if (validFiles.length > 30) {
+                                        message += `(최대 30개만 선택 가능)`;
+                                    } else {
+                                        message += `(100MB 이하 JPG 파일만 지원)`;
+                                    }
+                                    this.showErrorMessage(message);
                                 }
                                 
                                 this.updateFileSelectionUI();
-                                this.showSuccessMessage(`${this.selectedFiles.length}개 파일이 선택되었습니다.`);
+                                this.showSuccessMessage(`${this.selectedFiles.length}개 파일이 선택되었습니다. (최대 30개)`);
                             } else if (data.action === google.picker.Action.CANCEL) {
                                 console.log('사용자가 파일 선택을 취소했습니다.');
                             }
